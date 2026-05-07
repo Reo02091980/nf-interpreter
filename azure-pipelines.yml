@@ -1359,7 +1359,7 @@ jobs:
     condition: >-
       or(
         and(
-          succeeded('Build_nanoCLR_CLI'),
+          succeeded('Build_WIN32_nanoCLR'),
           ne(dependencies.Check_Build_Options.outputs['BuildOptions.SKIP_BUILD'], 'true'),
           ne(variables['System.PullRequest.PullRequestId'], ''),
           eq(dependencies.Check_Build_Options.outputs['BuildOptions.RUN_MSCORLIB_TESTS'], 'true')
@@ -1368,14 +1368,14 @@ jobs:
           eq(variables['Build.Reason'], 'Manual'),
           or(
             eq(variables['BUILD_ALL__'], 'true'),
-            eq(variables['BUILD_NANOCLR_CLI__'], 'true')
+            eq(variables['BUILD_WINDOWS_NANOCLR__'], 'true')
           ),
           eq(variables['RUN_MSCORLIB_TESTS__'], 'true')
         )
       )
 
     dependsOn:
-      - Build_nanoCLR_CLI
+      - Build_WIN32_nanoCLR
       - Check_Build_Options
 
     pool:
