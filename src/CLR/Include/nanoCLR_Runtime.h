@@ -575,6 +575,10 @@ extern int s_CLR_RT_fTrace_GC_Depth;
 extern int s_CLR_RT_fTrace_SimulateSpeed;
 extern int s_CLR_RT_fTrace_AssemblyOverhead;
 
+#if defined(NANOCLR_TRACE_GENERICS)
+extern int s_CLR_RT_fTrace_GenericFields;
+#endif
+
 #if defined(VIRTUAL_DEVICE)
 extern int s_CLR_RT_fTrace_ARM_Execution;
 
@@ -1215,6 +1219,14 @@ struct CLR_RT_SignatureParser
     /// @brief Index into MetodDef table
     CLR_INDEX Method;
 
+    /// @brief When true the next CLASS/VALUETYPE element must read its arg-count byte unconditionally.
+    /// Set by DATATYPE_GENERICINST and cleared after the following class element is consumed.
+    /// This is required for nested generic types (e.g. List<T>.Enumerator) whose TypeDef has
+    /// genericParamCount == 0 (no own generic params) even though the metadata processor writes
+    /// cumulative enclosing-type arg counts into the signature.
+    /// Always reset to false by every Initialize_* function.
+    bool m_pendingGenericInst;
+
     //--//
 
     void Initialize_TypeSpec(CLR_RT_Assembly *assm, CLR_PMETADATA ts);
@@ -1589,8 +1601,12 @@ struct CLR_RT_Assembly : public CLR_RT_HeapBlock_Node // EVENT HEAP - NO RELOCAT
 
   public:
     void DumpOpcode(CLR_RT_StackFrame *stack, CLR_PMETADATA ip) DECL_POSTFIX;
-    void DumpOpcodeDirect(CLR_RT_MethodDef_Instance &call, CLR_PMETADATA ip, CLR_PMETADATA ipStart, int pid)
-        DECL_POSTFIX;
+    void DumpOpcodeDirect(
+        CLR_RT_MethodDef_Instance &call,
+        CLR_PMETADATA ip,
+        CLR_PMETADATA ipStart,
+        int pid,
+        const CLR_RT_TypeSpec_Index *parentCtx = nullptr) DECL_POSTFIX;
 
   private:
     void DumpToken(
@@ -2099,6 +2115,12 @@ struct CLR_RT_TypeSystem // EVENT HEAP - NO RELOCATION -
         const CLR_RT_TypeSpec_Index *genericType,
         char *&szBuffer,
         size_t &size);
+    HRESULT BuildMethodName(
+        const CLR_RT_MethodDef_Instance &mdInst,
+        const CLR_RT_TypeSpec_Index *genericType,
+        const CLR_RT_TypeSpec_Index *parentCtx,
+        char *&szBuffer,
+        size_t &size);
     HRESULT BuildFieldName(const CLR_RT_FieldDef_Index &fd, char *&szBuffer, size_t &size);
     HRESULT BuildMethodRefName(const CLR_RT_MethodRef_Index &method, char *&szBuffer, size_t &iBuffer);
     HRESULT BuildMethodRefName(
@@ -2123,7 +2145,8 @@ struct CLR_RT_TypeSystem // EVENT HEAP - NO RELOCATION -
         const CLR_RT_TypeDef_Index &cls,
         const CLR_RT_MethodDef_Index &calleeMD,
         const char *calleeName,
-        CLR_RT_MethodDef_Index &index);
+        CLR_RT_MethodDef_Index &index,
+        bool suffixMatchOnly = false);
 
     static bool MatchSignature(CLR_RT_SignatureParser &parserLeft, CLR_RT_SignatureParser &parserRight);
     static bool MatchSignatureDirect(
@@ -3143,7 +3166,13 @@ struct CLR_RT_GarbageCollector
     {
         if (field->m_fields)
         {
+            // Relocate the internal pointers within each HeapBlock in the array
+            // (must be done before updating m_fields, while it still points to the old location)
             CLR_RT_GarbageCollector::Heap_Relocate(field->m_fields, field->m_count);
+
+            // Update m_fields pointer itself to wherever the block array moved after compaction.
+            // Without this, m_fields becomes a dangling pointer after any GC compaction.
+            CLR_RT_GarbageCollector::Heap_Relocate((void **)&field->m_fields);
         }
 
         if (field->m_fieldDefs)

@@ -961,6 +961,27 @@ void CLR_RT_Assembly::DumpSignatureToken(const CLR_UINT8 *&p)
 
 //--//
 
+//
+// Returns true only when 'p' is a non-null pointer that lies within the process's
+// user-mode address space.  On 64-bit Windows/Linux user-mode addresses are always
+// below 2^47 (0x0000_8000_0000_0000); anything at or above that range (e.g. the
+// all-ones 0xFFFF_FFFF_FFFF_FFFF from a dangling calleeInst.m_typeSpecStorage) is a
+// kernel / guard / garbage address and must not be dereferenced.
+//
+static inline bool IsUserModePtr(const void *p)
+{
+    if (p == nullptr)
+        return false;
+
+#if defined(_WIN64) || (defined(__GNUC__) && defined(__x86_64__))
+    // On 64-bit: user-space tops out at canonical address boundary 0x00007FFF_FFFF_FFFF
+    return (reinterpret_cast<uintptr_t>(p) < 0x0000800000000000ULL);
+#else
+    // On 32-bit: any non-null pointer is potentially valid; let the OS fault on a bad one.
+    return true;
+#endif
+}
+
 void CLR_RT_Assembly::DumpOpcode(CLR_RT_StackFrame *stack, CLR_PMETADATA ip)
 {
     NATIVE_PROFILE_CLR_DIAGNOSTICS();
@@ -968,6 +989,7 @@ void CLR_RT_Assembly::DumpOpcode(CLR_RT_StackFrame *stack, CLR_PMETADATA ip)
         return;
 
     CLR_RT_MethodDef_Instance inst;
+    const CLR_RT_TypeSpec_Index *parentCtx = nullptr;
 
     if (s_CLR_RT_fTrace_Instructions >= c_CLR_RT_Trace_Verbose)
     {
@@ -976,7 +998,7 @@ void CLR_RT_Assembly::DumpOpcode(CLR_RT_StackFrame *stack, CLR_PMETADATA ip)
         // When the current frame has an open generic type (contains MVAR) but no MethodSpec,
         // inherit the caller frame's MethodSpec so BuildTypeName can resolve the MVAR to its
         // concrete type (e.g. List<MVAR_0> + caller MethodSpec<String> -> List<String>).
-        if (!NANOCLR_INDEX_IS_VALID(inst.methodSpec) && inst.genericType != nullptr &&
+        if (!NANOCLR_INDEX_IS_VALID(inst.methodSpec) && IsUserModePtr(inst.genericType) &&
             NANOCLR_INDEX_IS_VALID(*inst.genericType))
         {
             CLR_RT_StackFrame *caller = stack->Caller();
@@ -985,20 +1007,45 @@ void CLR_RT_Assembly::DumpOpcode(CLR_RT_StackFrame *stack, CLR_PMETADATA ip)
                 inst.methodSpec = caller->m_call.methodSpec;
             }
         }
+
+        // When the current frame's genericType has open VAR params (e.g. List+Enumerator<!0>),
+        // search caller frames for a closed generic context that can resolve the open params.
+        // Example: Enumerator<!0>.ctor called from List<String>.GetEnumerator() resolves !0 = String.
+        if (IsUserModePtr(inst.genericType) && NANOCLR_INDEX_IS_VALID(*inst.genericType))
+        {
+            CLR_RT_TypeSpec_Instance tsInst{};
+            if (tsInst.InitializeFromIndex(*inst.genericType) && !tsInst.IsClosedGenericType())
+            {
+                for (CLR_RT_StackFrame *f = stack->Caller(); f != nullptr; f = f->Caller())
+                {
+                    const CLR_RT_TypeSpec_Index *callerGT = f->m_call.genericType;
+                    if (IsUserModePtr(callerGT) && NANOCLR_INDEX_IS_VALID(*callerGT))
+                    {
+                        CLR_RT_TypeSpec_Instance callerTs{};
+                        if (callerTs.InitializeFromIndex(*callerGT) && callerTs.IsClosedGenericType())
+                        {
+                            parentCtx = callerGT;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
     else
     {
-        inst.Clear();
+        inst.ClearInstance();
     }
 
-    DumpOpcodeDirect(inst, ip, stack->m_IPstart, stack->m_owningThread->m_pid);
+    DumpOpcodeDirect(inst, ip, stack->m_IPstart, stack->m_owningThread->m_pid, parentCtx);
 }
 
 void CLR_RT_Assembly::DumpOpcodeDirect(
     CLR_RT_MethodDef_Instance &call,
     CLR_PMETADATA ip,
     CLR_PMETADATA ipStart,
-    int pid)
+    int pid,
+    const CLR_RT_TypeSpec_Index *parentCtx)
 {
     NATIVE_PROFILE_CLR_DIAGNOSTICS();
     CLR_Debug::Printf("    [%04x:%04x", pid, (int)(ip - ipStart));
@@ -1006,7 +1053,7 @@ void CLR_RT_Assembly::DumpOpcodeDirect(
     if (NANOCLR_INDEX_IS_VALID(call))
     {
         CLR_Debug::Printf(":");
-        CLR_RT_DUMP::METHOD(call, call.genericType);
+        CLR_RT_DUMP::METHOD(call, call.genericType, parentCtx);
     }
 
     CLR_OPCODE op = CLR_ReadNextOpcodeCompressed(ip);
@@ -1159,6 +1206,21 @@ void CLR_RT_DUMP::METHOD(const CLR_RT_MethodDef_Instance &mdInst, const CLR_RT_T
     size_t iBuffer = MAXSTRLEN(rgBuffer);
 
     g_CLR_RT_TypeSystem.BuildMethodName(mdInst, genericType, szBuffer, iBuffer);
+
+    CLR_Debug::Printf("%s", rgBuffer);
+}
+
+void CLR_RT_DUMP::METHOD(
+    const CLR_RT_MethodDef_Instance &mdInst,
+    const CLR_RT_TypeSpec_Index *genericType,
+    const CLR_RT_TypeSpec_Index *parentCtx)
+{
+    NATIVE_PROFILE_CLR_DIAGNOSTICS();
+    char rgBuffer[512];
+    char *szBuffer = rgBuffer;
+    size_t iBuffer = MAXSTRLEN(rgBuffer);
+
+    g_CLR_RT_TypeSystem.BuildMethodName(mdInst, genericType, parentCtx, szBuffer, iBuffer);
 
     CLR_Debug::Printf("%s", rgBuffer);
 }
