@@ -5,16 +5,18 @@
 
 // MCUboot bootloader entry point for STM32 ChibiOS targets
 //
-// Execution sequence after Reset_Handler (ChibiOS crt0_v7m.s):
-//   1. crt0_v7m.s: set up stacks, copy .data, zero .bss, call __early_init
+// Execution sequence after Reset_Handler:
+//   1. set up stacks, copy .data, zero .bss, call __early_init, etc.
 //   2. main():
 //        a. halInit()  — clock, GPIO, enabled peripheral drivers, board.c
 //        b. chSysInit() — start the ChibiOS RT kernel (OSAL for SPI/WSPI/SERIAL)
 //        c. Initialise external storage (mcuboot_ext_flash_init or mcuboot_sdcard_init)
-//        d. Run MCUboot (boot_go)
-//        e. Launch the selected image (do_boot)
+//        d. Check recovery button and run SMP serial recovery if pressed (mcuboot_serial_recovery_try)
+//           If recovery is triggered, this never returns (device resets after image upload)
+//        e. Run MCUboot (boot_go) — only if recovery was not triggered
+//        f. Launch the selected image (do_boot)
 //
-// do_boot() performs the low-level Cortex-M7 image launch:
+// do_boot() performs the low-level Cortex image launch:
 //   - Stop SysTick so it cannot fire during handoff
 //   - Set SCB->VTOR to the application vector table address
 //   - Load the application's initial MSP from the vector table
@@ -22,14 +24,14 @@
 //   - Jump to the application's reset handler
 //
 // The bootloader never returns from do_boot().  If boot_go() fails (no valid
-// image found), the system enters a safe infinite loop.
+// image found), the system enters SMP serial recovery (when MCUBOOT_SERIAL is
+// defined) so firmware can be uploaded over SMP, or halts if serial recovery
+// is unavailable.
 
 #include <stdint.h>
 #include <string.h>
 
 // ChibiOS HAL and RT kernel headers.
-// The series device header (stm32f7xx.h / stm32f769xx.h) and CMSIS core
-// header (core_cm7.h) are included transitively by hal.h.
 #include "hal.h"
 #include "ch.h"
 
@@ -37,6 +39,7 @@
 #include "bootutil/image.h"
 
 #include "mcuboot_board_iface.h"
+#include "mcuboot_serial_port.h"
 
 // ----------------------------------------------------------------------- //
 // do_boot — hand off to the application image selected by MCUboot          //
@@ -45,8 +48,8 @@
 // Structure of the Cortex-M ARM vector table (first two entries)
 typedef struct
 {
-    uint32_t msp;    // Initial Main Stack Pointer
-    uint32_t reset;  // Reset Handler address
+    uint32_t msp;   // Initial Main Stack Pointer
+    uint32_t reset; // Reset Handler address
 } VectorTable_t;
 
 __attribute__((noreturn)) static void do_boot(struct boot_rsp *rsp)
@@ -99,19 +102,11 @@ __attribute__((noreturn)) static void do_boot(struct boot_rsp *rsp)
 
 int main(void)
 {
-    // Initialise the ChibiOS HAL: configures clocks (via mcuconf.h PLL settings),
-    // enables GPIO clocks, initialises each enabled peripheral driver, and calls
-    // boardInit() (board.c) to apply the full pin-mux configuration.
+    // Initialise the ChibiOS HAL
     halInit();
 
-    // Start the ChibiOS RT kernel.  The SPI/WSPI/SERIAL HAL drivers rely on the
-    // RT OSAL (hal_osal_rt_nil.h) for mutexes and condition-variable primitives;
-    // those are available only after chSysInit().
+    // Start the ChibiOS RT kernel.
     chSysInit();
-
-    // Board-specific hardware initialisation (e.g. USB CDC, UART).
-    // Called before external storage init so the port is available from the start.
-    mcuboot_target_init();
 
     // Initialise the board's external flash device
     // Non-fatal: if the external device fails to initialise the boot will still
@@ -125,17 +120,27 @@ int main(void)
     (void)mcuboot_sdcard_init();
 #endif
 
+#if defined(MCUBOOT_SERIAL)
+    // Check recovery button and - if held - run the SMP serial recovery loop.
+    // If the button is not pressed, returns immediately and boot continues.
+    mcuboot_serial_recovery_try();
+#endif
+
     // Run MCUboot image validation and upgrade logic
     struct boot_rsp rsp;
     if (boot_go(&rsp) != 0)
     {
-        // No valid image found — enter a safe infinite loop
-        // A debugger or JTAG reset is required to recover
+#if defined(MCUBOOT_SERIAL)
+        // No valid image found - enter SMP serial recovery
+        mcuboot_serial_recovery_start();
+#else
+        // No valid image and no serial recovery available: halt.
         while (1)
         {
             __BKPT(0);
             __NOP();
         }
+#endif
     }
 
     // Launch the selected image
