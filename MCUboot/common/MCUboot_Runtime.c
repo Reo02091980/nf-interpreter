@@ -100,29 +100,4 @@ nf_mcuboot_error_t nf_mcuboot_set_image_pending(
     return NF_MCUBOOT_SUCCESS;
 }
 
-/**
- * @brief Confirm the CLR image after startup health checks pass.
- * 
- * Queries the CLR image state and, if it is in test state (unconfirmed upgrade),
- * confirms it so it persists across the next reboot.
- */
-nf_mcuboot_error_t nf_mcuboot_startup_ok(void)
-{
-    int swap_type;
-    nf_mcuboot_error_t result;
-
-    result = nf_mcuboot_image_state(NF_MCUBOOT_IMAGE_CLR, &swap_type);
-    if (result != NF_MCUBOOT_SUCCESS)
-    {
-        return result;
-    }
-
-    if (swap_type == BOOT_SWAP_TYPE_TEST)
-    {
-        result = nf_mcuboot_confirm_image(NF_MCUBOOT_IMAGE_CLR);
-    }
-
-    return result;
-}
-
 #endif // NF_FEATURE_HAS_MCUBOOT

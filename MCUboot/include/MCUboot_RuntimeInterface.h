@@ -116,14 +116,15 @@ nf_mcuboot_error_t nf_mcuboot_set_image_pending(
 
 /**
  * @brief Confirm the CLR image after startup health checks pass.
- * 
- * Called once after the CLR execution engine has been successfully initialized.
- * If the CLR image is running in test state (unconfirmed upgrade), this
- * finalizes the upgrade so it survives the next reboot.
- * 
+ *
+ * Uses the boot-time state snapshot captured by nf_mcuboot_startup_init().
+ * If the CLR image is running under an unconfirmed swap, this finalizes the
+ * upgrade so it persists across the next reboot.
+ * Falls back to a live flash read if the boot snapshot was not available.
+ *
  * @return NF_MCUBOOT_SUCCESS on success; NF_MCUBOOT_* error code on failure
- * 
- * @note This is a no-op if the CLR image is already confirmed (not in test state).
+ *
+ * @note This is a no-op if the CLR image is already confirmed or was not swapped.
  */
 nf_mcuboot_error_t nf_mcuboot_startup_ok(void);
 
