@@ -1,4 +1,4 @@
-# MCUboot serial recovery - image list probe
+﻿﻿# MCUboot serial recovery - image list probe
 # Change COM port to match your device (check Device Manager)
 $PORT = "COM8"
 $BAUD = 115200   # irrelevant for USB CDC but required by the API
@@ -37,7 +37,7 @@ $sp.ReadTimeout = 2000
 try {
     $sp.Open()
 } catch {
-    Write-Host "ERROR: Could not open $PORT — $_"
+    Write-Host "ERROR: Could not open $PORT - $_"
     exit 1
 }
 $sp.BaseStream.Write($packet, 0, $packet.Length)
@@ -55,6 +55,6 @@ try {
         $decoded = [Convert]::FromBase64String($b64resp)
         Write-Host "Decoded SMP+CRC ($($decoded.Length) bytes): $(($decoded | ForEach-Object { '{0:X2}' -f $_ }) -join ' ')"
     }
-} catch { Write-Host "Timeout — no response" }
+} catch { Write-Host "Timeout - no response" }
 
 $sp.Close()
