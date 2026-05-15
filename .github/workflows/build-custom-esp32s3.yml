@@ -37,8 +37,10 @@ jobs:
           cmake -S . -B build/ESP32_S3_ALL \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.esp32.cmake \
             -DTARGET=ESP32_S3_ALL \
+            -DTARGET_BOARD=ESP32_S3_ALL \
             -DRTOS=FREERTOS \
             -DESP32_IDF_PATH=$HOME/esp-idf \
+            -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf \
             -G Ninja
           cmake --build build/ESP32_S3_ALL
 
