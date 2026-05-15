@@ -1,0 +1,50 @@
+name: Build Custom ESP32-S3 Firmware
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install ESP-IDF dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake ninja-build \
+            python3-pip libusb-1.0-0 wget flex bison \
+            gperf ccache libffi-dev libssl-dev dfu-util
+
+      - name: Clone ESP-IDF
+        run: |
+          git clone --depth 1 --branch v5.1.2 \
+            https://github.com/espressif/esp-idf.git /esp-idf
+          cd /esp-idf && ./install.sh esp32s3
+
+      - name: Build nanoFramework ESP32_S3_ALL
+        run: |
+          . /esp-idf/export.sh
+          cmake -S . -B build/ESP32_S3_ALL \
+            -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.esp32.cmake \
+            -DTARGET=ESP32_S3_ALL \
+            -DRTOS=FREERTOS \
+            -DESP32_IDF_PATH=/esp-idf \
+            -G Ninja
+          cmake --build build/ESP32_S3_ALL
+
+      - name: Upload firmware artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ESP32_S3_ALL_PSRAM_custom
+          path: build/ESP32_S3_ALL/nanoCLR.bin
+          retention-days: 30
