@@ -34,11 +34,16 @@ jobs:
       - name: Build nanoFramework ESP32_S3_ALL
         run: |
           . $HOME/esp-idf/export.sh
+
+          # Mostrar opciones validas de RTOS en el log
+          echo "=== Opciones RTOS en CMakeLists.txt ==="
+          grep -n "RTOS" CMakeLists.txt | head -30
+
           cmake -S . -B build/ESP32_S3_ALL \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.esp32.cmake \
             -DTARGET=ESP32_S3_ALL \
             -DTARGET_BOARD=ESP32_S3_ALL \
-            -DRTOS=FREERTOS \
+            -DRTOS=FreeRTOS \
             -DESP32_IDF_PATH=$HOME/esp-idf \
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf \
             -G Ninja
