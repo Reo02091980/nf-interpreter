@@ -28,17 +28,17 @@ jobs:
       - name: Clone ESP-IDF
         run: |
           git clone --depth 1 --branch v5.1.2 \
-            https://github.com/espressif/esp-idf.git /esp-idf
-          cd /esp-idf && ./install.sh esp32s3
+            https://github.com/espressif/esp-idf.git $HOME/esp-idf
+          cd $HOME/esp-idf && ./install.sh esp32s3
 
       - name: Build nanoFramework ESP32_S3_ALL
         run: |
-          . /esp-idf/export.sh
+          . $HOME/esp-idf/export.sh
           cmake -S . -B build/ESP32_S3_ALL \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.esp32.cmake \
             -DTARGET=ESP32_S3_ALL \
             -DRTOS=FREERTOS \
-            -DESP32_IDF_PATH=/esp-idf \
+            -DESP32_IDF_PATH=$HOME/esp-idf \
             -G Ninja
           cmake --build build/ESP32_S3_ALL
 
