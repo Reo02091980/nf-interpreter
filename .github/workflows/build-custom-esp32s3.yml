@@ -24,8 +24,6 @@ jobs:
           sudo apt-get install -y git ninja-build \
             python3-pip libusb-1.0-0 wget flex bison \
             gperf ccache libffi-dev libssl-dev dfu-util
-
-          # Instalar CMake 3.30.5 - minimo requerido, sin el bug de 3.31
           pip install cmake==3.30.5
           export PATH=$HOME/.local/bin:$PATH
           cmake --version
@@ -42,11 +40,10 @@ jobs:
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
 
-          cmake --version
-
           cmake -S . -B build/ESP32_S3 \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
             -DTARGET_BOARD=ESP32_S3 \
+            -DTARGET_SERIES=ESP32_S3 \
             -DRTOS=ESP32 \
             -DESP32_IDF_PATH=$HOME/esp-idf \
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf \
