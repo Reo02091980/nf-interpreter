@@ -26,7 +26,6 @@ jobs:
             gperf ccache libffi-dev libssl-dev dfu-util
           pip install cmake==3.30.5
           export PATH=$HOME/.local/bin:$PATH
-          cmake --version
 
       - name: Clone ESP-IDF
         run: |
@@ -40,6 +39,9 @@ jobs:
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
 
+          # Crear la carpeta build dentro del source para que el sdkconfig.default pueda escribirse
+          mkdir -p build
+
           cmake -S . -B build/ESP32_S3 \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
             -DTARGET_BOARD=ESP32_S3 \
@@ -49,6 +51,7 @@ jobs:
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf \
             -DCMAKE_MAKE_PROGRAM=$(which ninja) \
             -DNF_FEATURE_WATCHDOG=ON \
+            -DCMAKE_DISABLE_SOURCE_CHANGES=OFF \
             -G Ninja
 
           cmake --build build/ESP32_S3
