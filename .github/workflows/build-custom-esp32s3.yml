@@ -21,9 +21,12 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y git cmake ninja-build \
+          sudo apt-get install -y git ninja-build \
             python3-pip libusb-1.0-0 wget flex bison \
             gperf ccache libffi-dev libssl-dev dfu-util
+
+          # Instalar CMake 3.21 especifico (compatible con este repo)
+          pip install cmake==3.21.4
           cmake --version
 
       - name: Clone ESP-IDF
@@ -36,6 +39,9 @@ jobs:
         run: |
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
+          export PATH=$HOME/.local/bin:$PATH
+
+          cmake --version
 
           cmake -S . -B build/ESP32_S3 \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
