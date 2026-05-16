@@ -18,7 +18,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install ESP-IDF dependencies
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y git cmake ninja-build \
@@ -31,25 +31,36 @@ jobs:
             https://github.com/espressif/esp-idf.git $HOME/esp-idf
           cd $HOME/esp-idf && ./install.sh esp32s3
 
-      - name: Build nanoFramework ESP32_S3_ALL
+      - name: Inspect repo structure
+        run: |
+          echo "=== Toolchain files ==="
+          find . -name "toolchain*.cmake" | sort
+          echo "=== Carpeta targets/ ==="
+          ls targets/
+          echo "=== Carpeta targets/ESP32 ==="
+          ls targets/ESP32/
+          echo "=== CMakePresets ==="
+          cat CMakePresets.json | python3 -m json.tool | grep -A5 "ESP32_S3"
+
+      - name: Build
         run: |
           . $HOME/esp-idf/export.sh
+          export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
 
-          # Mostrar opciones validas de RTOS en el log
-          echo "=== Opciones RTOS en CMakeLists.txt ==="
-          grep -n "RTOS" CMakeLists.txt | head -30
+          TOOLCHAIN=$(find . -name "toolchain*.cmake" | grep -i esp32 | head -1)
+          echo "Toolchain: $TOOLCHAIN"
 
           cmake -S . -B build/ESP32_S3_ALL \
-            -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.esp32.cmake \
-            -DTARGET=ESP32_S3_ALL \
+            -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN \
             -DTARGET_BOARD=ESP32_S3_ALL \
-            -DRTOS=FreeRTOS \
+            -DRTOS=ESP32 \
             -DESP32_IDF_PATH=$HOME/esp-idf \
-            -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf \
+            -DCMAKE_MAKE_PROGRAM=$(which ninja) \
             -G Ninja
+
           cmake --build build/ESP32_S3_ALL
 
-      - name: Upload firmware artifact
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ESP32_S3_ALL_PSRAM_custom
