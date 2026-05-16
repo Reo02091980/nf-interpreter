@@ -36,9 +36,9 @@ jobs:
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
 
-          cmake -S . -B build/ESP32_S3_ALL \
+          cmake -S . -B build/ESP32_S3 \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
-            -DTARGET_BOARD=ESP32_S3_ALL \
+            -DTARGET_BOARD=ESP32_S3 \
             -DRTOS=ESP32 \
             -DESP32_IDF_PATH=$HOME/esp-idf \
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf \
@@ -46,11 +46,11 @@ jobs:
             -DNF_FEATURE_WATCHDOG=ON \
             -G Ninja
 
-          cmake --build build/ESP32_S3_ALL
+          cmake --build build/ESP32_S3
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: ESP32_S3_ALL_PSRAM_custom
-          path: build/ESP32_S3_ALL/nanoCLR.bin
+          name: ESP32_S3_PSRAM_custom
+          path: build/ESP32_S3/nanoCLR.bin
           retention-days: 30
