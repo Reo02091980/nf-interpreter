@@ -32,21 +32,20 @@ jobs:
             https://github.com/espressif/esp-idf.git $HOME/esp-idf
           cd $HOME/esp-idf && ./install.sh esp32s3
 
-      - name: Prepare build directory
-        run: |
-          # Crear archivos que el build necesita escribir en el source tree
-          mkdir -p build
-          touch build/sdkconfig.default
-          touch sdkconfig
-
       - name: Build
         run: |
           export PATH=$HOME/.local/bin:$PATH
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
 
-          cmake -S . -B build/ESP32_S3 \
-            -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
+          # Build directory FUERA del source tree
+          BUILD_DIR=$HOME/nf_build/ESP32_S3
+          mkdir -p $HOME/nf_build/build
+          touch $HOME/nf_build/build/sdkconfig.default
+          touch $HOME/nf_build/sdkconfig
+
+          cmake -S $GITHUB_WORKSPACE -B $BUILD_DIR \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/CMake/toolchain.xtensa-esp32s3-elf.cmake \
             -DTARGET_BOARD=ESP32_S3 \
             -DTARGET_SERIES=ESP32_S3 \
             -DRTOS=ESP32 \
@@ -56,11 +55,11 @@ jobs:
             -DNF_FEATURE_WATCHDOG=ON \
             -G Ninja
 
-          cmake --build build/ESP32_S3
+          cmake --build $BUILD_DIR
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: ESP32_S3_PSRAM_custom
-          path: build/ESP32_S3/nanoCLR.bin
+          path: ~/nf_build/ESP32_S3/nanoCLR.bin
           retention-days: 30
