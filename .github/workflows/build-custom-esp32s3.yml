@@ -25,7 +25,6 @@ jobs:
             python3-pip libusb-1.0-0 wget flex bison \
             gperf ccache libffi-dev libssl-dev dfu-util
           pip install cmake==3.30.5
-          export PATH=$HOME/.local/bin:$PATH
 
       - name: Clone ESP-IDF
         run: |
@@ -33,14 +32,18 @@ jobs:
             https://github.com/espressif/esp-idf.git $HOME/esp-idf
           cd $HOME/esp-idf && ./install.sh esp32s3
 
+      - name: Prepare build directory
+        run: |
+          # Crear archivos que el build necesita escribir en el source tree
+          mkdir -p build
+          touch build/sdkconfig.default
+          touch sdkconfig
+
       - name: Build
         run: |
           export PATH=$HOME/.local/bin:$PATH
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
-
-          # Crear la carpeta build dentro del source para que el sdkconfig.default pueda escribirse
-          mkdir -p build
 
           cmake -S . -B build/ESP32_S3 \
             -DCMAKE_TOOLCHAIN_FILE=CMake/toolchain.xtensa-esp32s3-elf.cmake \
@@ -51,7 +54,6 @@ jobs:
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf \
             -DCMAKE_MAKE_PROGRAM=$(which ninja) \
             -DNF_FEATURE_WATCHDOG=ON \
-            -DCMAKE_DISABLE_SOURCE_CHANGES=OFF \
             -G Ninja
 
           cmake --build build/ESP32_S3
