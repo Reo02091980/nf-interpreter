@@ -43,6 +43,7 @@ jobs:
             -DESP32_IDF_PATH=$HOME/esp-idf \
             -DTOOLCHAIN_PREFIX=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin/xtensa-esp32s3-elf \
             -DCMAKE_MAKE_PROGRAM=$(which ninja) \
+            -DNF_FEATURE_WATCHDOG=ON \
             -G Ninja
 
           cmake --build build/ESP32_S3_ALL
