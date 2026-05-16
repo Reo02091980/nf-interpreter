@@ -25,8 +25,9 @@ jobs:
             python3-pip libusb-1.0-0 wget flex bison \
             gperf ccache libffi-dev libssl-dev dfu-util
 
-          # Instalar CMake 3.21 especifico (compatible con este repo)
-          pip install cmake==3.21.4
+          # Instalar CMake 3.30.5 - minimo requerido, sin el bug de 3.31
+          pip install cmake==3.30.5
+          export PATH=$HOME/.local/bin:$PATH
           cmake --version
 
       - name: Clone ESP-IDF
@@ -37,9 +38,9 @@ jobs:
 
       - name: Build
         run: |
+          export PATH=$HOME/.local/bin:$PATH
           . $HOME/esp-idf/export.sh
           export PATH=$HOME/.espressif/tools/xtensa-esp32s3-elf/esp-12.2.0_20230208/xtensa-esp32s3-elf/bin:$PATH
-          export PATH=$HOME/.local/bin:$PATH
 
           cmake --version
 
